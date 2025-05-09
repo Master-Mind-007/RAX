@@ -1,2 +1,2 @@
 pip install -r requirements.txt
-gunicorn app:app --reload=True
+python app.py
