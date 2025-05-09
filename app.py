@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 import random
 import os
+import uvicorn
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -123,5 +124,7 @@ def execute_console_command(device_id):
         return jsonify({"error": "Device is inactive"}), 400
     return jsonify({"error": "Device not found"}), 404
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001)
+if __name__ == "__main__":
+    logging.info(f"Starting Uvicorn server...")
+    uvicorn.run( "app:app", host="0.0.0.0", port=5001, reload=True, log_level="info")
+
