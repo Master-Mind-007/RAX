@@ -238,13 +238,25 @@
             showModal(title, errorHtml);
         }
         
-        function formatTimestamp(isoString) {
-            if (!isoString) return 'N/A';
+        function formatTimestampToUTC(dateString) {
+            if (!dateString || String(dateString).trim() === "") return 'N/A';
             try {
-                const date = new Date(isoString);
-                return date.toLocaleString();
+                const date = new Date(dateString);
+                if (isNaN(date.getTime())) { // Check for Invalid Date
+                     return String(dateString); // Return original string if parsing results in Invalid Date
+                }
+                
+                const year = date.getUTCFullYear();
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                const hours = String(date.getUTCHours()).padStart(2, '0');
+                const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+                const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+                
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
             } catch (e) {
-                return isoString; // Return original if parsing fails
+                console.error("Error formatting timestamp:", dateString, e);
+                return String(dateString); // Fallback to original string on any unexpected error
             }
         }
 
@@ -270,7 +282,7 @@
                 statusBadgeCard.className = `badge status ${device.status.toLowerCase()}`; // Ensure class is lowercase
                 card.querySelector('[data-field="id"]').textContent = device.id;
                 card.querySelector('[data-field="ip_address"]').textContent = device.ip_address || 'N/A';
-                card.querySelector('[data-field="last_seen"]').textContent = formatTimestamp(device.last_seen);
+                card.querySelector('[data-field="last_seen"]').textContent = formatTimestampToUTC(device.last_seen);
                 card.querySelector('[data-field="cpu_usage"]').textContent = device.cpu_usage || 'N/A';
                 card.querySelector('[data-field="ram_usage"]').textContent = device.ram_usage || 'N/A';
                 // card.querySelector('[data-field="uptime"]').textContent = device.uptime || 'N/A';
@@ -291,7 +303,7 @@
                 row.querySelector('[data-field="name"]').textContent = device.name || 'Unknown Device';
                 row.querySelector('[data-field="id"]').textContent = device.id;
                 row.querySelector('[data-field="ip_address"]').textContent = device.ip_address || 'N/A';
-                row.querySelector('[data-field="last_seen"]').textContent = formatTimestamp(device.last_seen);
+                row.querySelector('[data-field="last_seen"]').textContent = formatTimestampToUTC(device.last_seen);
 
                 // Add event listeners for list actions
                 row.querySelectorAll('[data-action]').forEach(button => {
@@ -366,8 +378,8 @@
                         <dt class="col-sm-4">Num Processors</dt><dd class="col-sm-8">${data.num_processors || 'N/A'}</dd>
                         <dt class="col-sm-4">Total RAM</dt><dd class="col-sm-8">${data.total_ram_mb ? data.total_ram_mb + ' MB' : 'N/A'}</dd>
                         <dt class="col-sm-4">Reported IP</dt><dd class="col-sm-8">${data.reported_ip || 'N/A'}</dd>
-                        <dt class="col-sm-4">First Seen</dt><dd class="col-sm-8">${formatTimestamp(data.first_seen)}</dd>
-                        <dt class="col-sm-4">Last Seen</dt><dd class="col-sm-8">${formatTimestamp(data.last_seen)}</dd>
+                        <dt class="col-sm-4">First Seen</dt><dd class="col-sm-8">${formatTimestampToUTC(data.first_seen)}</dd>
+                        <dt class="col-sm-4">Last Seen</dt><dd class="col-sm-8">${formatTimestampToUTC(data.last_seen)}</dd>
                     </dl>`;
                     if(data.system_info_string_formatted) {
                         detailsHtml += `<h6>Full System Info:</h6><pre class="bg-light text-dark p-2 rounded small">${data.system_info_string_formatted.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
@@ -389,8 +401,8 @@
                             logsHtml += `
                                 <div class="list-group-item list-group-item-dark flex-column align-items-start mb-1 p-2">
                                     <div class="d-flex w-100 justify-content-between">
-                                        <small class="text-muted">Client: ${formatTimestamp(log.client_timestamp)}</small>
-                                        <small class="text-muted">Server: ${formatTimestamp(log.server_timestamp)}</small>
+                                        <small class="text-muted">Client: ${formatTimestampToUTC(log.client_timestamp)}</small>
+                                        <small class="text-muted">Server: ${formatTimestampToUTC(log.server_timestamp)}</small>
                                     </div>
                                     <p class="mb-1 small"><strong>Window:</strong> ${log.window_title.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
                                     <pre class="mb-0 bg-secondary text-light p-1 rounded small" style="white-space: pre-wrap; word-break: break-all;">${log.log_data.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
@@ -412,7 +424,7 @@
                     
                     const screenshotHtml = `
                         <img src="${data.screenshot_url}" alt="Device Screenshot Placeholder" class="img-fluid rounded mx-auto d-block" style="max-height:400px;">
-                        <p class="text-muted text-center mt-2">Timestamp: ${formatTimestamp(data.timestamp)}</p>
+                        <p class="text-muted text-center mt-2">Timestamp: ${formatTimestampToUTC(data.timestamp)}</p>
                         ${data.message ? `<p class="alert alert-info mt-2">${data.message}</p>` : ''}
                     `;
                     showModal(`${titlePrefix} - Screenshot`, screenshotHtml);
@@ -454,8 +466,9 @@
                                         <span class="badge bg-${cmd.status === 'completed' ? 'success' : (cmd.status === 'pending' || cmd.status === 'executing' ? 'warning text-dark' : 'danger')}">${cmd.status}</span>
                                     </div>
                                     <small class="text-muted d-block">ID: ${cmd.command_id}</small>
-                                    <small class="text-muted d-block">Sent: ${formatTimestamp(cmd.sent_timestamp)}</small>
-                                    ${cmd.completed_timestamp ? `<small class="text-muted d-block">Completed: ${formatTimestamp(cmd.completed_timestamp)}</small>` : ''}
+                                    <small class="text-muted d-block">Sent: ${formatTimestampToUTC(cmd.sent_timestamp)}</small>
+                                    ${cmd.executed_timestamp ? `<small class="text-muted d-block">Executed: ${formatTimestampToUTC(cmd.executed_timestamp)}</small>` : ''}
+                                    ${cmd.completed_timestamp ? `<small class="text-muted d-block">Completed: ${formatTimestampToUTC(cmd.completed_timestamp)}</small>` : ''}
                                     ${cmd.output ? `<pre class="mt-1 mb-0 bg-secondary text-light p-1 rounded small" style="white-space: pre-wrap; word-break: break-all;">Output: ${cmd.output.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>` : ''}
                                     ${cmd.error ? `<pre class="mt-1 mb-0 bg-danger text-light p-1 rounded small" style="white-space: pre-wrap; word-break: break-all;">Error: ${cmd.error.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>` : ''}
                                 </div>`;
