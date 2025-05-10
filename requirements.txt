@@ -1,7 +1,8 @@
 python-dotenv==0.19.0
 Werkzeug==2.0.1
 uvicorn[standard]
-fastapi 
+fastapi[all] 
 pymysql
 pydantic
 jinja2
+python-multipart
