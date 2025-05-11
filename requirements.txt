@@ -1,8 +1,10 @@
-python-dotenv==0.19.0
-Werkzeug==2.0.1
+python-dotenv
+Werkzeug
 uvicorn[standard]
 fastapi[all] 
 pymysql
 pydantic
 jinja2
 python-multipart
+verboselogs
+coloredlogs
